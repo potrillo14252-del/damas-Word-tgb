@@ -1,0 +1,142 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DAMAS WORLD TGB</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101d32;color:white;font-family:Arial;text-align:center}
+header{padding:25px 10px}
+h1{color:#e9bd63;letter-spacing:3px}
+header p{color:#bdc8da}
+main{max-width:480px;margin:auto;padding:15px}
+.panel{background:#1b2b45;border:1px solid #344762;border-radius:18px;padding:18px}
+button,select{padding:12px;border-radius:10px;border:1px solid #c9a451;background:#263c59;color:white;margin:5px;font-size:15px}
+#board{display:grid;grid-template-columns:repeat(8,1fr);width:100%;aspect-ratio:1;margin:18px auto;border:4px solid #d3aa58}
+.cell{display:flex;align-items:center;justify-content:center;aspect-ratio:1}
+.light{background:#e9dfc9}
+.dark{background:#34445b}
+.piece{width:76%;height:76%;border-radius:50%;border:4px solid #b99a62;box-shadow:inset 0 0 5px #777}
+.white{background:#fff}
+.black{background:#151515}
+.king:after{content:"♛";color:#d7ad51;font-size:25px}
+.selected{outline:4px solid #e9bd63;outline-offset:-4px}
+.move{background:#738b54}
+#status{color:#e9bd63;font-weight:bold;margin:15px}
+</style>
+</head>
+<body>
+<header>
+<h1>DAMAS WORLD TGB</h1>
+<p>PIENSA. MUEVE. CONQUISTA.</p>
+</header>
+<main>
+<div class="panel">
+<h3>ELIGE TU MODALIDAD</h3>
+<select id="mode">
+<option value="ai">Contra la computadora</option>
+<option value="local">Dos jugadores</option>
+</select>
+<button onclick="newGame()">Nueva partida</button>
+<div id="status">Tu turno: blancas</div>
+<div id="board"></div>
+<p id="score">Blancas: 12 | Negras: 12</p>
+</div>
+</main>
+<script>
+let b=[],turn="w",selected=null,legal=[];
+function newGame(){
+ b=Array.from({length:8},()=>Array(8).fill(null));
+ for(let r=0;r<3;r++)for(let c=0;c<8;c++)
+  if((r+c)%2===1)b[r][c]={color:"b",king:false};
+ for(let r=5;r<8;r++)for(let c=0;c<8;c++)
+  if((r+c)%2===1)b[r][c]={color:"w",king:false};
+ turn="w";selected=null;render();
+}
+function moves(r,c,capturesOnly=false){
+ let p=b[r][c];if(!p)return [];
+ let dirs=p.king?[-1,1]:[p.color==="w"?-1:1];
+ let out=[];
+ for(let d of dirs)for(let dc of [-1,1]){
+  let nr=r+d,nc=c+dc;
+  if(nr<0||nr>7||nc<0||nc>7)continue;
+  if(b[nr][nc]&&b[nr][nc].color!==p.color){
+   let jr=nr+d,jc=nc+dc;
+   if(jr>=0&&jr<8&&jc>=0&&jc<8&&!b[jr][jc])
+    out.push({r:jr,c:jc,capture:{r:nr,c:nc}});
+  }else if(!b[nr][nc]&&!capturesOnly)
+   out.push({r:nr,c:nc});
+ }
+ return out;
+}
+function allMoves(color){
+ let a=[],hasCapture=false;
+ for(let r=0;r<8;r++)for(let c=0;c<8;c++)
+  if(b[r][c]?.color===color)
+   for(let m of moves(r,c))
+    if(m.capture)hasCapture=true;
+ for(let r=0;r<8;r++)for(let c=0;c<8;c++)
+  if(b[r][c]?.color===color)
+   for(let m of moves(r,c,hasCapture))a.push({from:{r,c},to:m});
+ return a;
+}
+function render(){
+ let board=document.getElementById("board");board.innerHTML="";
+ for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+  let cell=document.createElement("div");
+  cell.className="cell "+((r+c)%2?"dark":"light");
+  if(selected&&selected.r===r&&selected.c===c)cell.classList.add("selected");
+  if(legal.some(m=>m.r===r&&m.c===c))cell.classList.add("move");
+  let p=b[r][c];
+  if(p){
+   let piece=document.createElement("div");
+   piece.className="piece "+(p.color==="w"?"white":"black")+(p.king?" king":"");
+   cell.appendChild(piece);
+  }
+  cell.onclick=()=>clickCell(r,c);
+  board.appendChild(cell);
+ }
+ let w=b.flat().filter(p=>p?.color==="w").length;
+ let n=b.flat().filter(p=>p?.color==="b").length;
+ document.getElementById("score").textContent="Blancas: "+w+" | Negras: "+n;
+ document.getElementById("status").textContent=
+  w===0?"¡Ganan las negras!":n===0?"¡Ganan las blancas!":
+  turn==="w"?"Turno de blancas":"Turno de negras";
+}
+function clickCell(r,c){
+ if(turn!=="w"&&document.getElementById("mode").value==="ai")return;
+ if(selected){
+  let m=legal.find(x=>x.r===r&&x.c===c);
+  if(m){play(selected.r,selected.c,m);return;}
+ }
+ if(b[r][c]?.color===turn){
+  selected={r,c};
+  let all=allMoves(turn);
+  legal=all.filter(x=>x.from.r===r&&x.from.c===c).map(x=>x.to);
+  render();
+ }
+}
+function play(r,c,m){
+ let p=b[r][c];b[m.r][m.c]=p;b[r][c]=null;
+ if(m.capture)b[m.capture.r][m.capture.c]=null;
+ if((p.color==="w"&&m.r===0)||(p.color==="b"&&m.r===7))p.king=true;
+ selected=null;legal=[];
+ turn=turn==="w"?"b":"w";render();
+ if(!allMoves(turn).length){document.getElementById("status").textContent="¡Partida terminada!";return;}
+ if(turn==="b"&&document.getElementById("mode").value==="ai")
+  setTimeout(aiMove,600);
+}
+function aiMove(){
+ let a=allMoves("b");
+ if(!a.length)return;
+ a.sort((x,y)=>Number(!!y.to.capture)-Number(!!x.to.capture));
+ let best=a.filter(x=>!!x.to.capture===!!a[0].to.capture);
+ let m=best[Math.floor(Math.random()*best.length)];
+ play(m.from.r,m.from.c,m.to);
+}
+newGame();
+</script>
+</body>
+</html>
